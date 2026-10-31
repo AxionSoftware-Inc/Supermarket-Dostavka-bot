@@ -1,0 +1,16 @@
+[Unit]
+Description=Supermarket Delivery Bot and Mini App
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/supermarket_dostavka
+ExecStart=/root/supermarket_dostavka/venv/bin/python3 /root/supermarket_dostavka/server_start.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
