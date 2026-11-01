@@ -76,7 +76,8 @@ async def handle_start(message: Message):
         f"Bizda 1000 dan ortiq yangi meva-sabzavotlar, oziq-ovqat va maishiy mahsulotlar mavjud.\n"
         f"⚡️ <b>Yetkazib berish vaqti:</b> 25 - 40 daqiqa!\n"
         f"🚚 150 000 so'mdan yuqori xaridlar uchun <b>bepul yetkazish</b>!\n\n"
-        f"Xaridni boshlash uchun quyidagi tugmani bosing 👇"
+        f"Xaridni boshlash uchun quyidagi tugmani bosing 👇\n\n"
+        f"🌐 <b>To'g'ridan-to'g'ri havola:</b>\n{MINI_APP_URL}"
     )
 
     await message.answer(

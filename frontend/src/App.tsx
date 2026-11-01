@@ -20,7 +20,12 @@ export const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem('korzinka_cart');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => item && item.product && typeof item.product.price === 'number');
+      }
+      return [];
     } catch {
       return [];
     }
@@ -46,6 +51,7 @@ export const App: React.FC = () => {
   const [activeRole, setActiveRole] = useState<'client' | 'courier' | 'admin' | 'orders'>('client');
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Initialize Telegram
   useEffect(() => {
@@ -77,24 +83,28 @@ export const App: React.FC = () => {
   }, [cart]);
 
   // Load Initial Data
+  const loadStoreData = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [cats, prods, sett] = await Promise.all([
+        api.getCategories(),
+        api.getProducts(),
+        api.getSettings().catch(() => settings)
+      ]);
+      setCategories(cats || []);
+      setProducts(prods || []);
+      if (sett) setSettings(sett);
+    } catch (e: any) {
+      console.error("Initial load error:", e);
+      setLoadError("Mahsulotlarni yuklashda xatolik yuz berdi. Internet aloqangizni tekshiring.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [cats, prods, sett] = await Promise.all([
-          api.getCategories(),
-          api.getProducts(),
-          api.getSettings().catch(() => settings)
-        ]);
-        setCategories(cats);
-        setProducts(prods);
-        if (sett) setSettings(sett);
-      } catch (e) {
-        console.error("Initial load error:", e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
+    loadStoreData();
   }, []);
 
   // Filter products by category and search
@@ -251,11 +261,39 @@ export const App: React.FC = () => {
                   : 'Barcha sara mahsulotlar'}
               </h2>
               <span className="text-xs text-gray-400 font-semibold shrink-0">
-                {filteredProducts.length} ta
+                {isLoading ? 'Yuklanmoqda...' : `${filteredProducts.length} ta`}
               </span>
             </div>
 
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+              /* Loading Skeletons */
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} className="bg-white rounded-2xl p-2.5 border border-gray-100 shadow-sm animate-pulse space-y-2">
+                    <div className="aspect-square w-full rounded-xl bg-gray-200"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-2.5 bg-gray-100 rounded w-1/2"></div>
+                    <div className="flex justify-between items-center pt-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <div className="w-8 h-8 rounded-xl bg-gray-200"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : loadError ? (
+              /* Error with Retry */
+              <div className="bg-white rounded-2xl p-8 text-center border border-red-100 my-4 shadow-sm">
+                <span className="text-4xl block mb-2">⚠️</span>
+                <h3 className="text-sm font-bold text-gray-800 mb-1">Aloqa xatoligi</h3>
+                <p className="text-xs text-gray-500 mb-4">{loadError}</p>
+                <button
+                  onClick={loadStoreData}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95"
+                >
+                  🔄 Qayta yuklash
+                </button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 my-4">
                 <span className="text-4xl block mb-2">🔍</span>
                 <h3 className="text-sm font-bold text-gray-800">Hech narsa topilmadi</h3>
