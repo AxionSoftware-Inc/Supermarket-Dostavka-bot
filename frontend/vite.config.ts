@@ -2,7 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
+  build: {
+    target: ['es2020', 'safari14', 'ios14'],
+    minify: 'esbuild',
+    cssTarget: 'safari14'
+  },
   server: {
     port: 5173,
     host: true,

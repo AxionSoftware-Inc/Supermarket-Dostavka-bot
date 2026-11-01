@@ -1,6 +1,15 @@
 import { Category, Product, Order, StoreSettings } from './types';
 
-const API_BASE = '/api';
+// Supports both root '/' deployment and subpath like '/dostavka/'
+const getApiBase = () => {
+  const path = window.location.pathname;
+  if (path.startsWith('/dostavka')) {
+    return '/dostavka/api';
+  }
+  return '/api';
+};
+
+const API_BASE = getApiBase();
 
 export const api = {
   // Categories
