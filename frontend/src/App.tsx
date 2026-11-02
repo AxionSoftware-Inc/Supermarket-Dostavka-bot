@@ -49,23 +49,34 @@ export const App: React.FC = () => {
 
   // Active view: 'client' | 'orders' | 'courier' | 'admin'
   const [activeRole, setActiveRole] = useState<'client' | 'courier' | 'admin' | 'orders'>('client');
+  const [userRoleInfo, setUserRoleInfo] = useState<{ isAdmin: boolean; isCourier: boolean }>({ isAdmin: false, isCourier: false });
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Initialize Telegram
+  // Initialize Telegram & check permissions
   useEffect(() => {
     initTelegramApp();
 
-    // Check URL parameters for direct deep-linking
+    const user = getTelegramUser();
     const urlParams = new URLSearchParams(window.location.search);
-    const roleParam = urlParams.get('role');
+    const tgId = urlParams.get('tg_id') || user?.id;
+    const username = user?.username;
+
+    api.checkRole(tgId || undefined, username || undefined).then(res => {
+      setUserRoleInfo({ isAdmin: res.is_admin, isCourier: res.is_courier });
+      const roleParam = urlParams.get('role');
+      if (roleParam === 'admin' && res.is_admin) {
+        setActiveRole('admin');
+      } else if (roleParam === 'courier' && (res.is_courier || res.is_admin)) {
+        setActiveRole('courier');
+      }
+    }).catch(err => console.warn("Check role error:", err));
+
     const tabParam = urlParams.get('tab');
     const trackParam = urlParams.get('track');
 
-    if (roleParam === 'courier') setActiveRole('courier');
-    else if (roleParam === 'admin') setActiveRole('admin');
-    else if (tabParam === 'orders') setActiveRole('orders');
+    if (tabParam === 'orders') setActiveRole('orders');
 
     if (trackParam) {
       api.trackOrder(trackParam).then(order => {
@@ -216,6 +227,8 @@ export const App: React.FC = () => {
         onOpenCart={() => setIsCartOpen(true)}
         activeRole={activeRole}
         setActiveRole={setActiveRole}
+        isAdmin={userRoleInfo.isAdmin}
+        isCourier={userRoleInfo.isCourier}
       />
 
       {/* Main Content Area based on active view */}

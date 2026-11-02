@@ -42,6 +42,8 @@ export interface Courier {
   id: number;
   name: string;
   phone: string;
+  username?: string;
+  telegram_id?: string;
   vehicle_type: string;
   is_active: boolean;
 }

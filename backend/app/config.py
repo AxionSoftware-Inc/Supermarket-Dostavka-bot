@@ -10,6 +10,14 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{BASE_DIR}/korzin
 MINI_APP_URL = os.getenv("MINI_APP_URL", "http://localhost:5173")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# Dedicated system admin usernames (case-insensitive)
+ADMIN_USERNAMES = [
+    u.strip().lstrip("@").lower()
+    for u in os.getenv("ADMIN_USERNAMES", "Software_engineerings").split(",")
+    if u.strip()
+]
+
 ADMIN_TELEGRAM_IDS = [
     int(x.strip()) for x in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if x.strip().isdigit()
 ]

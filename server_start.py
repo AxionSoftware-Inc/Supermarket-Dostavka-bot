@@ -18,6 +18,7 @@ DATABASE_URL=sqlite+aiosqlite:///./korzinka_delivery.db
 MINI_APP_URL={APP_URL}
 HOST=0.0.0.0
 PORT=8000
+ADMIN_USERNAMES=Software_engineerings
 ADMIN_TELEGRAM_IDS=
 """
 with open(ENV_FILE, 'w') as f:

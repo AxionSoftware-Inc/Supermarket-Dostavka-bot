@@ -17,6 +17,7 @@ async def sync_customer_profile(db: AsyncSession, profile: CustomerCreateOrUpdat
     if not customer:
         customer = Customer(
             telegram_id=str(profile.telegram_id),
+            username=profile.username,
             name=profile.name,
             phone=profile.phone,
             address=profile.address,
@@ -26,6 +27,8 @@ async def sync_customer_profile(db: AsyncSession, profile: CustomerCreateOrUpdat
         db.add(customer)
     else:
         customer.name = profile.name or customer.name
+        if profile.username:
+            customer.username = profile.username
         if profile.phone:
             customer.phone = profile.phone
         if profile.address:
@@ -252,7 +255,7 @@ async def update_order_status(db: AsyncSession, order_id: int, status_update: Or
     return await get_order_by_id(db, order.id)
 
 # --- Couriers ---
-async def get_couriers(db: AsyncSession, active_only: bool = True) -> List[Courier]:
+async def get_couriers(db: AsyncSession, active_only: bool = False) -> List[Courier]:
     stmt = select(Courier)
     if active_only:
         stmt = stmt.where(Courier.is_active == True)
@@ -262,3 +265,62 @@ async def get_couriers(db: AsyncSession, active_only: bool = True) -> List[Couri
 async def get_courier_by_id(db: AsyncSession, courier_id: int) -> Optional[Courier]:
     result = await db.execute(select(Courier).where(Courier.id == courier_id))
     return result.scalar_one_or_none()
+
+async def get_courier_by_telegram_id(db: AsyncSession, telegram_id: str) -> Optional[Courier]:
+    result = await db.execute(select(Courier).where(Courier.telegram_id == str(telegram_id)))
+    return result.scalar_one_or_none()
+
+async def get_courier_by_username(db: AsyncSession, username: str) -> Optional[Courier]:
+    u = username.strip().lstrip("@").lower()
+    result = await db.execute(select(Courier).where(Courier.username.ilike(u)))
+    return result.scalar_one_or_none()
+
+async def get_courier_by_phone(db: AsyncSession, phone: str) -> Optional[Courier]:
+    clean_p = phone.strip().replace(" ", "").replace("-", "")
+    result = await db.execute(select(Courier).where(Courier.phone.contains(clean_p[-9:])))
+    return result.scalar_one_or_none()
+
+async def create_or_update_courier(db: AsyncSession, courier_data: dict) -> Courier:
+    telegram_id = courier_data.get("telegram_id")
+    courier = None
+    if telegram_id:
+        courier = await get_courier_by_telegram_id(db, str(telegram_id))
+    
+    if not courier and courier_data.get("phone"):
+        courier = await get_courier_by_phone(db, courier_data["phone"])
+
+    if not courier:
+        courier = Courier(
+            telegram_id=str(telegram_id) if telegram_id else None,
+            username=courier_data.get("username", "").strip().lstrip("@") or None,
+            name=courier_data.get("name", "Yangi Kuryer"),
+            phone=courier_data.get("phone", ""),
+            vehicle_type=courier_data.get("vehicle_type", "car"),
+            is_active=courier_data.get("is_active", True)
+        )
+        db.add(courier)
+    else:
+        if "name" in courier_data and courier_data["name"]:
+            courier.name = courier_data["name"]
+        if "phone" in courier_data and courier_data["phone"]:
+            courier.phone = courier_data["phone"]
+        if "username" in courier_data:
+            courier.username = courier_data["username"].strip().lstrip("@") if courier_data["username"] else courier.username
+        if "vehicle_type" in courier_data and courier_data["vehicle_type"]:
+            courier.vehicle_type = courier_data["vehicle_type"]
+        if "is_active" in courier_data:
+            courier.is_active = courier_data["is_active"]
+        if telegram_id:
+            courier.telegram_id = str(telegram_id)
+
+    await db.commit()
+    await db.refresh(courier)
+    return courier
+
+async def delete_courier(db: AsyncSession, courier_id: int) -> bool:
+    courier = await get_courier_by_id(db, courier_id)
+    if not courier:
+        return False
+    await db.delete(courier)
+    await db.commit()
+    return True

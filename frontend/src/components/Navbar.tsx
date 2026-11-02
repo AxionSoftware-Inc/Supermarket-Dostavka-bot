@@ -10,6 +10,8 @@ interface NavbarProps {
   onOpenCart: () => void;
   activeRole: 'client' | 'courier' | 'admin' | 'orders';
   setActiveRole: (role: 'client' | 'courier' | 'admin' | 'orders') => void;
+  isAdmin?: boolean;
+  isCourier?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +21,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   cartTotal,
   onOpenCart,
   activeRole,
-  setActiveRole
+  setActiveRole,
+  isAdmin = false,
+  isCourier = false
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm w-full overflow-hidden">
@@ -85,26 +89,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           📋 Buyurtmalarim
         </button>
-        <button
-          onClick={() => { hapticImpact('light'); setActiveRole('courier'); }}
-          className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap shrink-0 transition-all ${
-            activeRole === 'courier'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          🛵 Kuryer Paneli
-        </button>
-        <button
-          onClick={() => { hapticImpact('light'); setActiveRole('admin'); }}
-          className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap shrink-0 transition-all ${
-            activeRole === 'admin'
-              ? 'bg-gray-900 text-white shadow-sm'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          ⚙️ Admin
-        </button>
+        {(isCourier || isAdmin) && (
+          <button
+            onClick={() => { hapticImpact('light'); setActiveRole('courier'); }}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap shrink-0 transition-all ${
+              activeRole === 'courier'
+                ? 'bg-gray-900 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            🛵 Kuryer Paneli
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => { hapticImpact('light'); setActiveRole('admin'); }}
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap shrink-0 transition-all ${
+              activeRole === 'admin'
+                ? 'bg-gray-900 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            ⚙️ Admin
+          </button>
+        )}
       </div>
 
       {/* Search Bar (Only shown on client store tab) */}

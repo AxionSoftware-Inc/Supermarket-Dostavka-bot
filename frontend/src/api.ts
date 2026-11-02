@@ -115,5 +115,38 @@ export const api = {
     const res = await fetch(`${API_BASE}/couriers`);
     if (!res.ok) throw new Error('Kuryerlarni yuklab boʻlmadi');
     return res.json();
+  },
+
+  async saveCourier(courierData: { name: string; phone: string; username?: string; telegram_id?: string; vehicle_type?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/couriers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(courierData)
+    });
+    if (!res.ok) throw new Error('Kuryerni saqlab boʻlmadi');
+    return res.json();
+  },
+
+  async deleteCourier(courierId: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/couriers/${courierId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Kuryerni oʻchirib boʻlmadi');
+    return res.json();
+  },
+
+  // Role check
+  async checkRole(telegramId?: string, username?: string): Promise<{
+    role: 'admin' | 'courier' | 'client';
+    is_admin: boolean;
+    is_courier: boolean;
+    courier_id?: number;
+  }> {
+    const params = new URLSearchParams();
+    if (telegramId) params.append('telegram_id', telegramId);
+    if (username) params.append('username', username);
+    const res = await fetch(`${API_BASE}/admin/check-role?${params.toString()}`);
+    if (!res.ok) return { role: 'client', is_admin: false, is_courier: false };
+    return res.json();
   }
 };

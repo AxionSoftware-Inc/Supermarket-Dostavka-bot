@@ -8,16 +8,46 @@ from aiogram.types import (
     WebAppInfo,
     MenuButtonWebApp
 )
-from app.config import MINI_APP_URL
+from app.config import MINI_APP_URL, ADMIN_USERNAMES, ADMIN_TELEGRAM_IDS
 from app.bot.bot_instance import bot
 from app.database import AsyncSessionLocal
-from app.crud import sync_customer_profile
+from app.crud import (
+    sync_customer_profile,
+    get_courier_by_telegram_id,
+    get_courier_by_username,
+    create_or_update_courier
+)
 from app.schemas import CustomerCreateOrUpdate
 
 logger = logging.getLogger(__name__)
 router = Router()
 
-def get_main_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
+async def is_admin(user) -> bool:
+    if not user:
+        return False
+    u = (user.username or "").strip().lstrip("@").lower()
+    if u in ADMIN_USERNAMES:
+        return True
+    if user.id in ADMIN_TELEGRAM_IDS:
+        return True
+    return False
+
+async def is_courier(user) -> bool:
+    if not user:
+        return False
+    async with AsyncSessionLocal() as session:
+        c = await get_courier_by_telegram_id(session, str(user.id))
+        if c and c.is_active:
+            return True
+        if user.username:
+            c = await get_courier_by_username(session, user.username)
+            if c and c.is_active:
+                return True
+    return False
+
+async def get_main_keyboard(user) -> InlineKeyboardMarkup:
+    user_id = user.id if user else None
+    user_name = user.username if user else None
     web_app_url = MINI_APP_URL
     if user_id:
         sep = "&" if "?" in web_app_url else "?"
@@ -33,30 +63,60 @@ def get_main_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(
                 text="📦 Buyurtmalarim",
-                callback_data="my_orders"
+                web_app=WebAppInfo(url=f"{MINI_APP_URL}?tab=orders&tg_id={user_id}")
             ),
             InlineKeyboardButton(
                 text="📞 Aloqa / Yordam",
                 callback_data="help_info"
             )
-        ],
-        [
+        ]
+    ]
+
+    # Show Admin/Courier buttons ONLY to authorized users!
+    admin_status = await is_admin(user)
+    courier_status = await is_courier(user)
+
+    staff_buttons = []
+    if courier_status or admin_status:
+        staff_buttons.append(
             InlineKeyboardButton(
                 text="🛵 Kuryer Paneli",
                 web_app=WebAppInfo(url=f"{MINI_APP_URL}?role=courier")
-            ),
+            )
+        )
+    if admin_status:
+        staff_buttons.append(
             InlineKeyboardButton(
                 text="⚙️ Admin Paneli",
                 web_app=WebAppInfo(url=f"{MINI_APP_URL}?role=admin")
             )
-        ]
-    ]
+        )
+    if staff_buttons:
+        kb.append(staff_buttons)
+
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 @router.message(CommandStart())
 async def handle_start(message: Message):
-    user_id = message.from_user.id
-    user_name = message.from_user.first_name or "Mijoz"
+    user = message.from_user
+    user_id = user.id
+    user_name = user.first_name or "Mijoz"
+    username = user.username or None
+
+    # Sync / save customer profile in DB with username
+    try:
+        async with AsyncSessionLocal() as session:
+            await sync_customer_profile(
+                session,
+                CustomerCreateOrUpdate(
+                    telegram_id=str(user_id),
+                    username=username,
+                    name=[user.first_name, user.last_name] and " ".join(filter(None, [user.first_name, user.last_name])) or "Mijoz",
+                    phone=None
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Could not auto-register user on start: {e}")
 
     # Set Telegram Chat Menu button to open the Mini App directly from bottom-left
     try:
@@ -76,13 +136,13 @@ async def handle_start(message: Message):
         f"Bizda 1000 dan ortiq yangi meva-sabzavotlar, oziq-ovqat va maishiy mahsulotlar mavjud.\n"
         f"⚡️ <b>Yetkazib berish vaqti:</b> 25 - 40 daqiqa!\n"
         f"🚚 150 000 so'mdan yuqori xaridlar uchun <b>bepul yetkazish</b>!\n\n"
-        f"Xaridni boshlash uchun quyidagi tugmani bosing 👇\n\n"
-        f"🌐 <b>To'g'ridan-to'g'ri havola:</b>\n{MINI_APP_URL}"
+        f"Xaridni boshlash uchun quyidagi tugmani bosing 👇"
     )
 
+    kb = await get_main_keyboard(user)
     await message.answer(
         text=welcome_text,
-        reply_markup=get_main_keyboard(user_id)
+        reply_markup=kb
     )
 
 @router.message(F.contact)
@@ -111,7 +171,7 @@ async def handle_contact_message(message: Message):
     await message.answer(
         f"✅ Rahmat, <b>{full_name}</b>! Sizning telefon raqamingiz (<code>{phone}</code>) muvaffaqiyatli saqlandi.\n"
         f"Endi har safar xarid qilganda maʼlumotlarni qayta kiritishingiz shart emas! 🎉",
-        reply_markup=get_main_keyboard(message.from_user.id)
+        reply_markup=await get_main_keyboard(message.from_user)
     )
 
 @router.message(Command("orders"))
@@ -129,6 +189,10 @@ async def handle_orders_cmd(message: Message):
 
 @router.message(Command("courier"))
 async def handle_courier_cmd(message: Message):
+    if not (await is_courier(message.from_user) or await is_admin(message.from_user)):
+        await message.answer("⛔️ Siz kuryer sifatida ro'yxatdan o'tmagansiz. Do'kon ma'muriyatiga murojaat qiling.")
+        return
+
     await message.answer(
         "🛵 <b>Kuryer paneli:</b>\nBuyurtmalarni yetkazish va marshrutni ko'rish uchun quyidagi tugmani bosing:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
@@ -141,6 +205,10 @@ async def handle_courier_cmd(message: Message):
 
 @router.message(Command("admin"))
 async def handle_admin_cmd(message: Message):
+    if not await is_admin(message.from_user):
+        await message.answer("⛔️ Bu buyruq faqat do'kon administratori (@Software_engineerings) uchun mo'ljallangan.")
+        return
+
     await message.answer(
         "⚙️ <b>Do'kon Admin Paneli:</b>\nBuyurtmalar oqimi, mahsulotlar va kuryerlarni boshqarish:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[

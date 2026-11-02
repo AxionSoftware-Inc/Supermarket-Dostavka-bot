@@ -5,6 +5,7 @@ from datetime import datetime
 # Customer Profile Schemas
 class CustomerBase(BaseModel):
     telegram_id: str
+    username: Optional[str] = None
     name: str
     phone: Optional[str] = None
     address: Optional[str] = None
@@ -67,6 +68,7 @@ class ProductResponse(ProductBase):
 # Courier Schemas
 class CourierBase(BaseModel):
     telegram_id: Optional[str] = None
+    username: Optional[str] = None
     name: str
     phone: str
     vehicle_type: Optional[str] = "car"

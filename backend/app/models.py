@@ -10,6 +10,7 @@ class Customer(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(String(50), unique=True, index=True, nullable=False)
+    username = Column(String(100), nullable=True, index=True)
     name = Column(String(150), nullable=False)
     phone = Column(String(30), nullable=True)
     address = Column(String(300), nullable=True)
@@ -56,6 +57,7 @@ class Courier(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(String(50), unique=True, nullable=True)
+    username = Column(String(100), nullable=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=False)
     vehicle_type = Column(String(50), default="car") # car, moto, bike, walking
