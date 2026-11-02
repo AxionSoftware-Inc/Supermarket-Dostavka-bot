@@ -16,6 +16,10 @@ export const initTelegramApp = () => {
     try {
       webApp.ready();
       webApp.expand();
+      // Disable vertical swipe to prevent accidentally closing app on Android/iOS when scrolling
+      if (webApp.disableVerticalSwipes) {
+        webApp.disableVerticalSwipes();
+      }
       if (webApp.setHeaderColor) {
         webApp.setHeaderColor('#E31E24');
       }
