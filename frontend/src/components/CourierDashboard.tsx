@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Truck, MapPin, Phone, CheckCircle, Navigation, RefreshCw, AlertCircle } from 'lucide-react';
+import {
+  Truck,
+  MapPin,
+  Phone,
+  CheckCircle,
+  Navigation,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Package,
+  Clock
+} from 'lucide-react';
 import { Order, Courier } from '../types';
 import { api } from '../api';
 import { hapticImpact, hapticNotification } from '../telegram';
@@ -8,13 +19,15 @@ export const CourierDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [selectedCourierId, setSelectedCourierId] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<number | null>(null);
 
   const loadData = async () => {
     try {
       const [ordersData, couriersData] = await Promise.all([
-        api.getOrders({ limit: 40 }),
+        api.getOrders({ limit: 50 }),
         api.getCouriers()
       ]);
       setOrders(ordersData);
@@ -64,162 +77,203 @@ export const CourierDashboard: React.FC = () => {
     }
   };
 
+  // Active orders: pending, confirmed, or on the way (NOT delivered or cancelled)
   const activeOrders = orders.filter(o => o.status !== 'yetkazildi' && o.status !== 'bekor');
-  const finishedOrders = orders.filter(o => o.status === 'yetkazildi');
+  // Completed orders
+  const completedOrders = orders.filter(o => o.status === 'yetkazildi');
+
+  const currentList = activeTab === 'active' ? activeOrders : completedOrders;
 
   return (
-    <div className="max-w-2xl mx-auto px-3.5 sm:px-4 py-4 space-y-4 w-full overflow-x-hidden">
-      {/* Top Banner */}
-      <div className="bg-gray-900 text-white rounded-3xl p-4 sm:p-5 shadow-lg w-full">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center text-xl shrink-0">
-              🛵
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm sm:text-base font-extrabold truncate">Kuryer Ish Paneli</h2>
-              <p className="text-xs text-gray-400 truncate">Yetkazib berish xizmati</p>
-            </div>
-          </div>
-          <button
-            onClick={() => { hapticImpact('light'); loadData(); }}
-            className="p-2 rounded-xl bg-gray-800 text-gray-300 hover:text-white shrink-0 ml-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-
-        {/* Select Courier Identity */}
-        <div className="bg-gray-800/80 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-gray-300 font-medium shrink-0">Kuryer:</span>
+    <div className="max-w-xl mx-auto px-3 sm:px-4 py-3 space-y-3 w-full overflow-x-hidden">
+      {/* Sleek, Compact Top Bar (No oversized bulky banners) */}
+      <div className="bg-white rounded-2xl p-2.5 border border-gray-100 shadow-xs flex items-center justify-between gap-2">
+        {/* Courier Selector Pill */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="text-base shrink-0">🛵</span>
           <select
             value={selectedCourierId}
             onChange={(e) => setSelectedCourierId(Number(e.target.value))}
-            className="bg-gray-900 text-white text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-700 outline-none max-w-full flex-1"
+            className="bg-gray-50 text-gray-900 text-xs font-bold px-2 py-1.5 rounded-xl border border-gray-200 outline-none max-w-full flex-1 truncate"
           >
             {couriers.map(c => (
               <option key={c.id} value={c.id}>
-                {c.name} ({c.vehicle_type})
+                {c.name} ({c.vehicle_type === 'moto' ? 'Skuter' : c.vehicle_type === 'bike' ? 'Velik' : c.vehicle_type === 'walking' ? 'Piyoda' : 'Mashina'})
               </option>
             ))}
           </select>
         </div>
+
+        {/* Tab switchers: Faol vs Yetkazilgan */}
+        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-xl shrink-0">
+          <button
+            onClick={() => { hapticImpact('light'); setActiveTab('active'); }}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+              activeTab === 'active' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500'
+            }`}
+          >
+            Faol ({activeOrders.length})
+          </button>
+          <button
+            onClick={() => { hapticImpact('light'); setActiveTab('completed'); }}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+              activeTab === 'completed' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500'
+            }`}
+          >
+            Tarix ({completedOrders.length})
+          </button>
+        </div>
+
+        {/* Refresh button */}
+        <button
+          onClick={() => { hapticImpact('light'); loadData(); }}
+          className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-50 shrink-0"
+          title="Yangilash"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-red-600' : ''}`} />
+        </button>
       </div>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 gap-3 text-center">
-        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
-          <span className="text-xl font-black text-red-600">{activeOrders.length}</span>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">Faol buyurtmalar</p>
-        </div>
-        <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm">
-          <span className="text-xl font-black text-emerald-600">{finishedOrders.length}</span>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">Yetkazilganlar</p>
-        </div>
-      </div>
-
-      {/* Orders Stream */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-1">
-          Yetkazish uchun buyurtmalar:
-        </h3>
-
-        {activeOrders.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 text-gray-400 text-xs">
-            Hozircha faol buyurtmalar yo'q 👍
+      {/* Orders Stream (Only Active by Default) */}
+      <div className="space-y-2">
+        {currentList.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center border border-gray-100">
+            <Package className="w-8 h-8 text-gray-300 mx-auto mb-1.5" />
+            <p className="text-xs text-gray-600 font-semibold">
+              {activeTab === 'active' ? 'Faol buyurtmalar yo\'q' : 'Yetkazilgan buyurtmalar tarixi bo\'sh'}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {activeTab === 'active' ? 'Yangi buyurtma tushishi bilan bu yerda paydo bo\'ladi' : ''}
+            </p>
           </div>
         ) : (
-          activeOrders.map(order => {
+          currentList.map(order => {
+            const isExpanded = expandedOrderId === order.id;
+            const statusLabel =
+              order.status === 'yangi' ? { bg: 'bg-amber-100 text-amber-800', text: '⚡️ Yangi' } :
+              order.status === 'tasdiqlandi' ? { bg: 'bg-blue-100 text-blue-800', text: 'Tayyorlanmoqda' } :
+              order.status === 'kuryerda' ? { bg: 'bg-purple-100 text-purple-800', text: '🛵 Yo\'lda' } :
+              { bg: 'bg-emerald-100 text-emerald-800', text: '✅ Yetkazildi' };
+
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3 w-full overflow-hidden"
+                className="bg-white rounded-2xl p-3 border border-gray-100 shadow-xs space-y-2.5 transition-all hover:border-gray-200"
               >
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-extrabold text-sm text-gray-900 break-all">
-                      #{order.order_number}
+                {/* Header: #OrderNumber, Status Badge, Price & Payment */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-black text-xs text-gray-900">#{order.order_number}</span>
+                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${statusLabel.bg}`}>
+                      {statusLabel.text}
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                      order.status === 'yangi'
-                        ? 'bg-blue-100 text-blue-700'
-                        : order.status === 'kuryerda'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-purple-100 text-purple-700'
-                    }`}>
-                      {order.status.toUpperCase()}
+                    <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                      <Clock className="w-2.5 h-2.5" />
+                      {new Date(order.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <span className="text-xs font-black text-red-600 shrink-0">
-                    {order.total_amount.toLocaleString()} so'm
-                  </span>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-black text-gray-900">
+                      {order.total_amount.toLocaleString()} so'm
+                    </span>
+                    <span className="text-[10px] text-gray-400 ml-1 uppercase">
+                      ({order.payment_method})
+                    </span>
+                  </div>
                 </div>
 
-                {/* Customer & Location */}
-                <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 rounded-xl p-3 w-full">
-                  <div className="flex justify-between items-center gap-2 flex-wrap">
-                    <span className="font-bold text-gray-900 break-words flex-1 min-w-0">
-                      {order.customer_name}
+                {/* Customer Info & Address (Direct Clickable Actions) */}
+                <div className="bg-gray-50 rounded-xl p-2.5 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-gray-900 truncate">
+                      👤 {order.customer_name}
                     </span>
                     <a
                       href={`tel:${order.customer_phone}`}
-                      className="flex items-center gap-1 text-red-600 font-bold bg-white px-2 py-1 rounded-lg border border-red-100 shadow-xs shrink-0"
+                      className="flex items-center gap-1 text-red-600 bg-white font-bold px-2 py-0.5 rounded-lg border border-red-100 text-[11px] shadow-2xs hover:bg-red-50 shrink-0"
                     >
                       <Phone className="w-3 h-3" />
                       <span>{order.customer_phone}</span>
                     </a>
                   </div>
-                  <div className="flex items-start gap-1.5 text-gray-700 pt-1">
-                    <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                    <span className="break-words min-w-0 flex-1">{order.delivery_address}</span>
+
+                  {/* Address with Direct Navigation Action */}
+                  <div className="flex items-start justify-between gap-2 pt-0.5">
+                    <div className="flex items-start gap-1 text-gray-600 text-[11px] min-w-0 flex-1">
+                      <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                      <span className="break-words line-clamp-2">{order.delivery_address}</span>
+                    </div>
+
+                    <button
+                      onClick={() => openInMap(order)}
+                      className="flex items-center gap-1 bg-white hover:bg-blue-50 text-blue-600 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-blue-100 shrink-0 shadow-2xs"
+                    >
+                      <Navigation className="w-3 h-3" />
+                      <span>Xarita</span>
+                    </button>
                   </div>
+
                   {order.delivery_notes && (
-                    <p className="text-[11px] text-gray-400 italic break-words">
+                    <div className="text-[11px] text-gray-500 italic pt-0.5">
                       Izoh: {order.delivery_notes}
-                    </p>
+                    </div>
                   )}
                 </div>
 
-                {/* Products list summary */}
-                <div className="text-[11px] text-gray-500 flex flex-wrap gap-1">
-                  {order.items.map(item => (
-                    <span key={item.id} className="bg-gray-100 px-2 py-0.5 rounded-md break-words max-w-full">
-                      {item.product_name} ({item.quantity} {item.unit})
-                    </span>
-                  ))}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+                {/* Items Accordion Toggle */}
+                <div className="flex items-center justify-between text-[11px]">
                   <button
-                    onClick={() => openInMap(order)}
-                    className="flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-2 rounded-xl font-bold text-xs transition-colors truncate"
+                    onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                    className="text-gray-500 hover:text-gray-800 font-semibold flex items-center gap-1"
                   >
-                    <Navigation className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="truncate">Xaritada ochish</span>
+                    <span>📦 {order.items?.length || 0} xil mahsulot</span>
+                    {isExpanded ? <ChevronUp className="w-3 h-3 text-gray-400" /> : <ChevronDown className="w-3 h-3 text-gray-400" />}
                   </button>
 
-                  {order.status === 'yangi' || order.status === 'tasdiqlandi' ? (
-                    <button
-                      onClick={() => handleStatusChange(order.id, 'kuryerda')}
-                      disabled={isUpdating === order.id}
-                      className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white py-2.5 px-2 rounded-xl font-bold text-xs shadow-md shadow-red-500/20 active:scale-95 transition-all truncate"
-                    >
-                      <Truck className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Yo'lga chiqdim</span>
-                    </button>
-                  ) : order.status === 'kuryerda' ? (
-                    <button
-                      onClick={() => handleStatusChange(order.id, 'yetkazildi')}
-                      disabled={isUpdating === order.id}
-                      className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-2 rounded-xl font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all truncate"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Yetkazildi!</span>
-                    </button>
-                  ) : null}
+                  <span className="text-gray-400 text-[10px]">
+                    Yetkazish: {order.delivery_fee ? `${order.delivery_fee.toLocaleString()} so'm` : 'bepul'}
+                  </span>
                 </div>
+
+                {/* Expanded Items details */}
+                {isExpanded && (
+                  <div className="bg-gray-50 rounded-xl p-2 text-[11px] space-y-1 border border-gray-100 animate-in fade-in duration-100">
+                    {order.items?.map(it => (
+                      <div key={it.id} className="flex justify-between items-center text-gray-600">
+                        <span className="truncate flex-1">• {it.product_name}</span>
+                        <span className="font-semibold text-gray-800 shrink-0 ml-2">
+                          {it.quantity} {it.unit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Primary Action Button */}
+                {activeTab === 'active' && (
+                  <div className="pt-1">
+                    {order.status === 'yangi' || order.status === 'tasdiqlandi' ? (
+                      <button
+                        onClick={() => handleStatusChange(order.id, 'kuryerda')}
+                        disabled={isUpdating === order.id}
+                        className="w-full flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white py-2 rounded-xl font-bold text-xs shadow-xs transition-all"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        <span>Yo'lga chiqdim</span>
+                      </button>
+                    ) : order.status === 'kuryerda' ? (
+                      <button
+                        onClick={() => handleStatusChange(order.id, 'yetkazildi')}
+                        disabled={isUpdating === order.id}
+                        className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white py-2 rounded-xl font-bold text-xs shadow-xs transition-all"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>Yetkazildi deb belgilash</span>
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             );
           })
